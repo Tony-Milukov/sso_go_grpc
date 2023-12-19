@@ -1,0 +1,159 @@
+syntax = "proto3";
+option go_package = "proto/sso";
+
+package api;
+
+service Auth{
+  rpc Register (RegisterRequest) returns (RegisterResponse);
+  rpc Login (LoginRequest) returns (LoginResponse);
+
+  rpc GetUserById (GetUserByIdRequest) returns (GetUserByIdResponse);
+  rpc GetUserByEmail (GetUserEmailRequest) returns (GetUserEmailResponse);
+
+  rpc AddUserRole (AddUserRoleRequest) returns (AddUserRoleResponse);
+  rpc RemoveUserRole (RemoveUserRoleRequest) returns (RemoveUserRoleResponse);
+  rpc VerifyUserRoles  (VerifyUserRolesRequest) returns (VerifyUserRolesResponse);
+
+  rpc CreateRole (CreateRoleRequest) returns (CreateRoleResponse);
+  rpc UpdateRole (UpdateRoleRequest) returns (UpdateRoleResponse);
+  rpc DeleteRole  (DeleteRoleRequest) returns (DeleteRoleResponse);
+}
+
+// model of user
+message User {
+  uint64 userId = 1;
+  string username = 2;
+  string email = 3;
+
+  repeated Role roles = 4;
+}
+
+// model of Role
+
+message Role {
+  string name = 1;
+  string description = 2;
+}
+
+
+// Register
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string username = 3;
+}
+
+message RegisterResponse {
+  string token = 1;
+  uint64 userId = 2;
+}
+
+// Login
+message LoginRequest {
+  string token = 1;
+  uint64 userId = 2;
+}
+
+message LoginResponse {
+  string token = 1;
+  uint64 userId = 2;
+}
+
+// Get User By Id - returns a user depending on given id
+message GetUserByIdRequest {
+  uint64 userId = 1;
+}
+
+message GetUserByIdResponse {
+  string message = 1;
+  User user = 2;
+}
+
+// Get User By Id - returns a user depending on given email
+message GetUserEmailRequest {
+  string email = 1;
+}
+
+message GetUserEmailResponse {
+  string message = 1;
+  User user = 2;
+}
+
+// Get User By Id - returns user roles depending on given email
+message GetUserRolesRequest {
+  string userId = 1;
+}
+
+message GetUserRolesResponse {
+  string userId = 1;
+  repeated Role roles = 2;
+}
+
+// create new Role
+message CreateRoleRequest {
+  string token = 1;
+  uint64 userId = 2;
+  string name = 3;
+  string description = 4;
+}
+
+message CreateRoleResponse {
+  Role role = 1;
+}
+
+// update role
+message UpdateRoleRequest {
+  string token = 1;
+  uint64 roleId = 2;
+  string name = 3;
+  string description = 4;
+}
+
+message UpdateRoleResponse {
+  Role role = 1;
+}
+
+// delete role
+message DeleteRoleRequest {
+  string token = 1;
+  uint64 roleId = 2;
+}
+
+message DeleteRoleResponse {
+ string message = 1;
+}
+
+// setUserRoleRequest - give user a role
+message AddUserRoleRequest {
+  string token = 1;
+  string roleId = 2;
+  uint64 userId = 3;
+}
+
+message AddUserRoleResponse {
+  string message = 1;
+  User user = 2;
+}
+
+// RemoveUserRoleRequest - remove role from a user
+message RemoveUserRoleRequest {
+  string token = 1;
+  string roleId = 2;
+  uint64 userId = 3;
+}
+
+message RemoveUserRoleResponse {
+  string message = 1;
+  User user = 2;
+}
+
+// setUserRoleRequest - give user a role
+message VerifyUserRolesRequest {
+  string token = 1;
+  repeated string roles = 3;
+  uint64 userId = 4;
+}
+
+message VerifyUserRolesResponse {
+  bool verified = 1;
+}

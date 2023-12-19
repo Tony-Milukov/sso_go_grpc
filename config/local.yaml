@@ -1,0 +1,11 @@
+env: 'local' #prod
+db_link: "postgres://sso_edl3_user:YcABnuttHn8MJE0uqfSNoh33Fpmh8dEU@dpg-clmahr9fb9qs739abqbg-a.oregon-postgres.render.com/sso_edl3"
+db_type: 'postgres'
+
+grpc:
+  port: 9800
+  timeout: 10h
+
+
+jwt_secret: "topSecretKey"
+jwt_live: 24h
