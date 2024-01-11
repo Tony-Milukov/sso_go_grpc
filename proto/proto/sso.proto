@@ -24,15 +24,15 @@ message User {
   uint64 userId = 1;
   string username = 2;
   string email = 3;
-
   repeated Role roles = 4;
 }
 
 // model of Role
 
 message Role {
-  string name = 1;
-  string description = 2;
+  uint64 roleId = 1;
+  string name = 2;
+  string description = 3;
 }
 
 
@@ -50,8 +50,8 @@ message RegisterResponse {
 
 // Login
 message LoginRequest {
-  string token = 1;
-  uint64 userId = 2;
+  string email = 1;
+  string password = 2;
 }
 
 message LoginResponse {
@@ -65,7 +65,6 @@ message GetUserByIdRequest {
 }
 
 message GetUserByIdResponse {
-  string message = 1;
   User user = 2;
 }
 
@@ -75,30 +74,29 @@ message GetUserEmailRequest {
 }
 
 message GetUserEmailResponse {
-  string message = 1;
   User user = 2;
 }
 
-// Get User By Id - returns user roles depending on given email
-message GetUserRolesRequest {
-  string userId = 1;
-}
 
-message GetUserRolesResponse {
-  string userId = 1;
-  repeated Role roles = 2;
-}
 
 // create new Role
 message CreateRoleRequest {
   string token = 1;
-  uint64 userId = 2;
   string name = 3;
   string description = 4;
 }
 
 message CreateRoleResponse {
   Role role = 1;
+}
+
+// Get User By Id - returns user roles depending on given email
+message GetUserRolesRequest {
+  uint64 userId = 1;
+}
+
+message GetUserRolesResponse {
+  repeated Role roles = 2;
 }
 
 // update role
@@ -126,31 +124,29 @@ message DeleteRoleResponse {
 // setUserRoleRequest - give user a role
 message AddUserRoleRequest {
   string token = 1;
-  string roleId = 2;
+  uint64 roleId = 2;
   uint64 userId = 3;
 }
 
 message AddUserRoleResponse {
-  string message = 1;
   User user = 2;
 }
 
 // RemoveUserRoleRequest - remove role from a user
 message RemoveUserRoleRequest {
   string token = 1;
-  string roleId = 2;
+  uint64 roleId = 2;
   uint64 userId = 3;
 }
 
 message RemoveUserRoleResponse {
-  string message = 1;
   User user = 2;
 }
 
 // setUserRoleRequest - give user a role
 message VerifyUserRolesRequest {
   string token = 1;
-  repeated string roles = 3;
+  repeated uint64 roleIds = 3;
   uint64 userId = 4;
 }
 

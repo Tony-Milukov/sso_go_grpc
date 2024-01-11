@@ -3,18 +3,24 @@ package main
 import (
 	"log/slog"
 	"os"
+	app "sso_go_grpc/internal/app"
+	"sso_go_grpc/internal/config"
 )
 
 func main() {
-	//cfg := config.MustLoad()
 
-	//log := setupLogger(cfg.Env)
+	//setting up config
+	cfg := config.MustLoad()
 
-	//storage := postgres.MustLoad(cfg.DB_link, cfg.DB_Type)
+	//setting up logger
+	log := setupLogger(cfg.Env)
 
-	//TODO: SET UP APPLICATION
+	application := app.New(log, cfg)
 
-	//TODO: RUN APPLICATION
+	//running GRPC Server
+	//if error -> panic
+	application.GRPCServer.MustRun()
+
 }
 
 // setupLogger returns logger depending on env | default = LevelDebug; dev = LevelInfo

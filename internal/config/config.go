@@ -9,15 +9,15 @@ import (
 )
 
 type GrpcConfig struct {
-	Port    string `yaml:"port" env-required`
+	Port    int    `yaml:"port" env-required`
 	Timeout string `yaml:"timeout" env-default:"12h"`
 }
 type Config struct {
-	Env        string `yaml:"env" env-required`
-	DB_link    string `yaml:"db_link" env-required`
-	DB_Type    string `yaml:"db_type" env-required`
-	JWT_SECRET string `yaml:"jwt_secret" env-required`
-	GRPC       GrpcConfig
+	Env       string `yaml:"env" env-required`
+	DbLink    string `yaml:"db_link" env-required`
+	DbType    string `yaml:"db_type" env-required`
+	JwtSecret string `yaml:"jwt_secret" env-required`
+	GRPC      GrpcConfig
 }
 
 // MustLoad returns a config by config path which was gotten from getConfigPath
@@ -45,7 +45,9 @@ func MustLoad() *Config {
 
 // getConfigPath this function returns config struct path = flag > os.ENV > defaultConfig
 func getConfigPath() string {
-	defaultPath := "../../config/local.yaml"
+
+	//TODO: FIX THE CONFIG PATH PARCING
+	defaultPath := "./config/local.yaml"
 	var configPath string
 
 	flag.StringVar(&configPath, "config", "", "Path to your config file (.yaml)")
