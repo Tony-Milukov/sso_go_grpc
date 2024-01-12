@@ -415,7 +415,7 @@ func (s *Storage) RemoveUserRole(ctx context.Context, roleId, userId uint64) err
 	op := "storage.postgres.RemoveUserRole"
 	logger := s.log.With("op", op)
 
-	prepared, err := s.db.Prepare(`DELETE "userRoles" ur WHERE ur.userId = $1 AND ur.roleId = $2 `)
+	prepared, err := s.db.Prepare(`DELETE FROM "userRoles" ur WHERE ur.userId = $1 AND ur.roleId = $2 `)
 
 	if err != nil {
 		logger.Debug("Error on preparing the query")

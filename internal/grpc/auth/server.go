@@ -209,7 +209,7 @@ func (s *serverApi) AddUserRole(ctx context.Context, req *sso.AddUserRoleRequest
 	user, err := s.authService.AddUserRole(ctx, req.GetToken(), req.GetRoleId(), req.GetUserId())
 
 	if err != nil {
-		if errors.Is(storage.ErrUserAndRoleIvalid, err) {
+		if errors.Is(storage.ErrUserAndRoleIvalid, err) || errors.Is(storage.ErrUserAlreadyHasTHeRole, err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 
@@ -224,6 +224,10 @@ func (s *serverApi) RemoveUserRole(ctx context.Context, req *sso.RemoveUserRoleR
 	user, err := s.authService.RemoveUserRole(ctx, req.GetToken(), req.GetRoleId(), req.GetUserId())
 
 	if err != nil {
+		if errors.Is(storage.ErrUserAndRoleIvalid, err) || errors.Is(storage.ErrUserDontHaveTheRole, err) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+
 		return nil, status.Error(codes.Internal, "Internal Server Error")
 	}
 

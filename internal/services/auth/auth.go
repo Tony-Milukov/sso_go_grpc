@@ -175,7 +175,6 @@ func (auth *Auth) GetUserRoles(
 	userId uint64,
 ) (roles []*sso.Role,
 	err error) {
-	//TODO: IMPLEMENT
 	return nil, status.Error(codes.Internal, "Not implemented")
 }
 
@@ -190,7 +189,7 @@ func (auth *Auth) DeleteRole(
 		if errors.Is(storage.ErrRoleNotExists, err) {
 			return storage.ErrRoleNotExists
 		}
-		return status.Error(codes.Internal, "Internal Server Error")
+		return err
 	}
 	return nil
 }
@@ -208,11 +207,7 @@ func (auth *Auth) UpdateRole(
 	role, err := auth.UserProvider.UpdateRole(ctx, name, description, roleId)
 
 	if err != nil {
-		if errors.Is(storage.ErrRoleNotExists, err) {
-			return nil, status.Error(codes.NotFound, err.Error())
-		}
-
-		return nil, status.Error(codes.Internal, "Internal Server Error")
+		return nil, err
 	}
 
 	return &sso.Role{
@@ -228,8 +223,6 @@ func (auth *Auth) AddUserRole(
 	roleId,
 	userId uint64,
 ) (*sso.User, error) {
-	// TODO: check if user already has the role
-
 	op := "service.auth.AddUserRole"
 	logger := auth.log.With("op", op)
 
@@ -239,6 +232,13 @@ func (auth *Auth) AddUserRole(
 	if err != nil {
 		logger.Debug("Error on checking user and role ids", err)
 		return nil, storage.ErrUserAndRoleIvalid
+	}
+
+	hasTheRole, err := auth.UserProvider.VerifyUserRole(ctx, roleId, userId)
+
+	// check if the user already has the role
+	if hasTheRole {
+		return nil, storage.ErrUserAlreadyHasTHeRole
 	}
 
 	// add role
@@ -258,19 +258,47 @@ func (auth *Auth) RemoveUserRole(
 	userId uint64,
 
 ) (*sso.User, error) {
-	// TODO: check if user already has the role
 	op := "service.auth.RemoveUserRole"
 	logger := auth.log.With("op", op)
 
 	// check if userId and roleId are valid
 	err := auth.CheckUserAndRoleExists(ctx, userId, roleId)
-
 	if err != nil {
 		logger.Debug("Error on checking user and role ids", err)
+		return nil, storage.ErrUserAndRoleIvalid
+	}
+
+	hasTheRole, err := auth.UserProvider.VerifyUserRole(ctx, roleId, userId)
+	if err != nil {
+		logger.Debug("Error on checking user role", err)
 		return nil, status.Error(codes.Internal, "Internal Server Error")
 	}
 
-	return nil, status.Error(codes.Internal, "Not implemented")
+	// check if the user already has the role
+	if !hasTheRole {
+		return nil, storage.ErrUserDontHaveTheRole
+	}
+
+	err = auth.UserProvider.RemoveUserRole(ctx, roleId, userId)
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, "Internal Server Error")
+	}
+
+	//get new user with updated roles
+	user, err := auth.GetUserById(ctx, userId)
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, "Internal Server Error")
+	}
+
+	var roles []*sso.Role
+
+	for _, role := range user.Roles {
+		roles = append(roles, &sso.Role{RoleId: role.RoleId, Description: role.Description, Name: role.Name})
+	}
+
+	return &sso.User{UserId: userId, Roles: roles, Username: user.Username, Email: user.Email}, nil
 }
 
 func (auth *Auth) VerifyUserRoles(
@@ -279,7 +307,7 @@ func (auth *Auth) VerifyUserRoles(
 	userId uint64,
 ) (verified bool, err error) {
 
-	op := "service.auth.RemoveUserRole"
+	op := "service.auth.VerifyUserRole"
 	logger := auth.log.With("op", op)
 
 	//check user exists
@@ -318,6 +346,7 @@ func (auth *Auth) VerifyUserRoles(
 			return false, status.Error(codes.Internal, "Internal Server Error")
 		}
 	}
+
 	return verified, nil
 }
 
@@ -331,7 +360,7 @@ func (auth *Auth) CheckUserAndRoleExists(ctx context.Context, userId, roleId uin
 	// handle errors for user getting
 	if err != nil {
 		if errors.Is(storage.ErrUserNotExists, err) {
-			return status.Error(codes.NotFound, "User with that userID was not defined")
+			return storage.ErrUserNotExists
 		}
 		return status.Error(codes.Internal, "Internal Server Error")
 	}
@@ -342,7 +371,7 @@ func (auth *Auth) CheckUserAndRoleExists(ctx context.Context, userId, roleId uin
 	// handle errors for role getting
 	if err != nil {
 		if errors.Is(storage.ErrRoleNotExists, err) {
-			return status.Error(codes.NotFound, "Role with that roleId was not defined")
+			return storage.ErrRoleNotExists
 		}
 
 		return status.Error(codes.Internal, "Internal Server Error")
