@@ -17,9 +17,9 @@ func New(log *slog.Logger, cfg *config.Config) *App {
 	//setting up storage
 	storage := postgres.MustLoad(cfg, log)
 
-	autService := authService.New(log, storage, cfg)
+	service := authService.New(log, storage, cfg)
 
-	app := grpcApp.New(log, autService, cfg.GRPC.Port)
+	app := grpcApp.New(log, service, cfg.GRPC.Port)
 
 	return &App{
 		GRPCServer: app,

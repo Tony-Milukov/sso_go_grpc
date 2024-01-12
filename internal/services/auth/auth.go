@@ -7,37 +7,26 @@ import (
 	"google.golang.org/grpc/status"
 	"log/slog"
 	"sso_go_grpc/internal/config"
-	"sso_go_grpc/internal/domain/models"
 	"sso_go_grpc/internal/lib/bcrypt"
 	"sso_go_grpc/internal/lib/jwt"
 	"sso_go_grpc/internal/storage"
 	"sso_go_grpc/internal/storage/postgres"
+	"sso_go_grpc/internal/storage/postgres/role"
+	"sso_go_grpc/internal/storage/postgres/user"
 	sso "sso_go_grpc/proto/gen"
 	//	jwt "sso_go_grpc/internal/lib/jwt"
 )
 
-// UserProvider is an interface for the Auth Service
-type UserProvider interface {
-	CreateUser(ctx context.Context, username, email, password string) (*models.User, error)
-	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
-	GetUserById(ctx context.Context, userId uint64) (*models.User, error)
-	GetRoleById(ctx context.Context, roleId uint64) (*models.Role, error)
-	CreateRole(ctx context.Context, name, description string) (*models.Role, error)
-	UpdateRole(ctx context.Context, name, description string, roleId uint64) (*models.Role, error)
-	DeleteRole(ctx context.Context, roleId uint64) error
-	AddUserRole(ctx context.Context, roleId, userId uint64) error
-	RemoveUserRole(ctx context.Context, roleId, userId uint64) error
-	VerifyUserRole(ctx context.Context, roleId, userId uint64) (bool, error)
-}
 type Auth struct {
-	log *slog.Logger
-	UserProvider
-	cfg *config.Config
+	Log          *slog.Logger
+	UserProvider *user.Storage
+	RoleProvider *role.Storage
+	Cfg          *config.Config
 }
 
 // New this function returns new AuthService with userProvider where are all the postgres methods
-func New(log *slog.Logger, userProvider *postgres.Storage, config *config.Config) *Auth {
-	return &Auth{log: log, UserProvider: userProvider, cfg: config}
+func New(log *slog.Logger, storage *postgres.Storage, config *config.Config) *Auth {
+	return &Auth{Log: log, UserProvider: storage.User, RoleProvider: storage.Role, Cfg: config}
 }
 
 func (auth *Auth) Register(
@@ -47,24 +36,25 @@ func (auth *Auth) Register(
 	username string,
 ) (token string, userId uint64, err error) {
 	op := "service.auth"
-	log := auth.log.With("op", op)
+	log := auth.Log.With("op", op)
 	user, err := auth.UserProvider.CreateUser(ctx, email, password, username)
 
 	if err != nil {
 		if errors.Is(err, storage.ErrUserExists) {
 			log.Debug("User with that username or email already exists")
-			return "", 0, status.Error(codes.AlreadyExists, "User with that email or username already exists")
+
+			return "", 0, storage.ErrUserExists
 		}
 		log.Debug("Error", err)
-		return "", 0, status.Error(codes.Internal, "Internal Error")
+		return "", 0, err
 	}
 
 	// generate token
-	token, err = jwt.NewToken(user, auth.cfg.JwtSecret)
+	token, err = jwt.NewToken(user, auth.Cfg.JwtSecret)
 
 	if err != nil {
 		log.Debug("Error on generating jwt", err)
-		return "", 0, status.Error(codes.Internal, "Internal Error")
+		return "", 0, err
 	}
 	return token, user.UserId, nil
 }
@@ -75,7 +65,7 @@ func (auth *Auth) Login(
 	password string,
 ) (token string, userId uint64, err error) {
 	op := "auth.service.Login"
-	logger := auth.log.With("op", op)
+	logger := auth.Log.With("op", op)
 
 	logger.Debug("Getting User from the database")
 	user, err := auth.UserProvider.GetUserByEmail(ctx, email)
@@ -89,11 +79,11 @@ func (auth *Auth) Login(
 	}
 
 	// generate token
-	token, err = jwt.NewToken(user, auth.cfg.JwtSecret)
+	token, err = jwt.NewToken(user, auth.Cfg.JwtSecret)
 
 	if err != nil {
 		logger.Debug("Error on generating jwt", err)
-		return "", 0, status.Error(codes.Internal, "Internal Error")
+		return "", 0, err
 	}
 	return token, user.UserId, nil
 }
@@ -105,7 +95,7 @@ func (auth *Auth) GetUserById(
 
 	op := "auth.service.GetUserById"
 
-	logger := auth.log.With("op", op)
+	logger := auth.Log.With("op", op)
 	user, err := auth.UserProvider.GetUserById(ctx, userId)
 
 	if err != nil {
@@ -114,7 +104,7 @@ func (auth *Auth) GetUserById(
 			return nil, storage.ErrUserNotExists
 		}
 
-		return nil, status.Error(codes.Internal, "Internal Server Error")
+		return nil, err
 	}
 
 	var roles []*sso.Role
@@ -137,7 +127,7 @@ func (auth *Auth) GetUserByEmail(
 	user, err := auth.UserProvider.GetUserByEmail(ctx, email)
 
 	if err != nil {
-		return nil, status.Error(codes.Internal, "Internal Server Error")
+		return nil, err
 	}
 
 	var protoRoles []*sso.Role
@@ -158,13 +148,13 @@ func (auth *Auth) CreateRole(
 	*sso.Role,
 	error,
 ) {
-	role, err := auth.UserProvider.CreateRole(ctx, name, description)
+	role, err := auth.RoleProvider.CreateRole(ctx, name, description)
 
 	if err != nil {
 		if errors.Is(storage.ErrRoleExists, err) {
 			return nil, storage.ErrRoleExists
 		}
-		return nil, status.Error(codes.Internal, "Internal Server Error")
+		return nil, err
 	}
 
 	return &sso.Role{RoleId: role.Id, Name: role.Name, Description: role.Description}, nil
@@ -183,7 +173,7 @@ func (auth *Auth) DeleteRole(
 	token string,
 	roleId uint64,
 ) error {
-	err := auth.UserProvider.DeleteRole(ctx, roleId)
+	err := auth.RoleProvider.DeleteRole(ctx, roleId)
 
 	if err != nil {
 		if errors.Is(storage.ErrRoleNotExists, err) {
@@ -204,7 +194,7 @@ func (auth *Auth) UpdateRole(
 ) (*sso.Role,
 	error,
 ) {
-	role, err := auth.UserProvider.UpdateRole(ctx, name, description, roleId)
+	role, err := auth.RoleProvider.UpdateRole(ctx, name, description, roleId)
 
 	if err != nil {
 		return nil, err
@@ -224,7 +214,7 @@ func (auth *Auth) AddUserRole(
 	userId uint64,
 ) (*sso.User, error) {
 	op := "service.auth.AddUserRole"
-	logger := auth.log.With("op", op)
+	logger := auth.Log.With("op", op)
 
 	// check if userId and roleId are valid
 	err := auth.CheckUserAndRoleExists(ctx, userId, roleId)
@@ -234,7 +224,7 @@ func (auth *Auth) AddUserRole(
 		return nil, storage.ErrUserAndRoleIvalid
 	}
 
-	hasTheRole, err := auth.UserProvider.VerifyUserRole(ctx, roleId, userId)
+	hasTheRole, err := auth.RoleProvider.VerifyUserRole(ctx, roleId, userId)
 
 	// check if the user already has the role
 	if hasTheRole {
@@ -242,10 +232,10 @@ func (auth *Auth) AddUserRole(
 	}
 
 	// add role
-	err = auth.UserProvider.AddUserRole(ctx, roleId, userId)
+	err = auth.RoleProvider.AddUserRole(ctx, roleId, userId)
 
 	if err != nil {
-		return nil, status.Error(codes.Internal, "Internal Server Error")
+		return nil, err
 	}
 
 	return auth.GetUserById(ctx, userId)
@@ -259,7 +249,7 @@ func (auth *Auth) RemoveUserRole(
 
 ) (*sso.User, error) {
 	op := "service.auth.RemoveUserRole"
-	logger := auth.log.With("op", op)
+	logger := auth.Log.With("op", op)
 
 	// check if userId and roleId are valid
 	err := auth.CheckUserAndRoleExists(ctx, userId, roleId)
@@ -268,10 +258,10 @@ func (auth *Auth) RemoveUserRole(
 		return nil, storage.ErrUserAndRoleIvalid
 	}
 
-	hasTheRole, err := auth.UserProvider.VerifyUserRole(ctx, roleId, userId)
+	hasTheRole, err := auth.RoleProvider.VerifyUserRole(ctx, roleId, userId)
 	if err != nil {
 		logger.Debug("Error on checking user role", err)
-		return nil, status.Error(codes.Internal, "Internal Server Error")
+		return nil, err
 	}
 
 	// check if the user already has the role
@@ -279,17 +269,17 @@ func (auth *Auth) RemoveUserRole(
 		return nil, storage.ErrUserDontHaveTheRole
 	}
 
-	err = auth.UserProvider.RemoveUserRole(ctx, roleId, userId)
+	err = auth.RoleProvider.RemoveUserRole(ctx, roleId, userId)
 
 	if err != nil {
-		return nil, status.Error(codes.Internal, "Internal Server Error")
+		return nil, err
 	}
 
 	//get new user with updated roles
 	user, err := auth.GetUserById(ctx, userId)
 
 	if err != nil {
-		return nil, status.Error(codes.Internal, "Internal Server Error")
+		return nil, err
 	}
 
 	var roles []*sso.Role
@@ -307,8 +297,8 @@ func (auth *Auth) VerifyUserRoles(
 	userId uint64,
 ) (verified bool, err error) {
 
-	op := "service.auth.VerifyUserRole"
-	logger := auth.log.With("op", op)
+	//op := "service.auth.VerifyUserRole"
+	//logger := auth.log.With("op", op)
 
 	//check user exists
 	_, err = auth.UserProvider.GetUserById(ctx, userId)
@@ -318,17 +308,13 @@ func (auth *Auth) VerifyUserRoles(
 		if errors.Is(storage.ErrUserNotExists, err) {
 			return false, storage.ErrUserNotExists
 		}
-		return false, status.Error(codes.Internal, "Internal Server Error")
+		return false, err
 	}
 
-	if err != nil {
-		logger.Debug("Error on checking user and role ids", err)
-		return false, status.Error(codes.Internal, "Internal Server Error")
-	}
 	for _, roleId := range roleIds {
 
 		//check if role exits
-		_, err = auth.UserProvider.GetRoleById(ctx, roleId)
+		_, err = auth.RoleProvider.GetRoleById(ctx, roleId)
 
 		// handle errors for role getting
 		if err != nil {
@@ -336,15 +322,10 @@ func (auth *Auth) VerifyUserRoles(
 				return false, storage.ErrRoleNotExists
 			}
 
-			return false, status.Error(codes.Internal, "Internal Server Error")
+			return false, err
 		}
 
-		verified, err = auth.UserProvider.VerifyUserRole(ctx, uint64(roleId), userId)
-
-		if err != nil {
-
-			return false, status.Error(codes.Internal, "Internal Server Error")
-		}
+		verified, err = auth.RoleProvider.VerifyUserRole(ctx, uint64(roleId), userId)
 	}
 
 	return verified, nil
@@ -362,11 +343,11 @@ func (auth *Auth) CheckUserAndRoleExists(ctx context.Context, userId, roleId uin
 		if errors.Is(storage.ErrUserNotExists, err) {
 			return storage.ErrUserNotExists
 		}
-		return status.Error(codes.Internal, "Internal Server Error")
+		return err
 	}
 
 	//check if role exits
-	_, err = auth.UserProvider.GetRoleById(ctx, roleId)
+	_, err = auth.RoleProvider.GetRoleById(ctx, roleId)
 
 	// handle errors for role getting
 	if err != nil {
@@ -374,7 +355,7 @@ func (auth *Auth) CheckUserAndRoleExists(ctx context.Context, userId, roleId uin
 			return storage.ErrRoleNotExists
 		}
 
-		return status.Error(codes.Internal, "Internal Server Error")
+		return err
 	}
 
 	return nil
