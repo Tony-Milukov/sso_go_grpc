@@ -3,7 +3,8 @@ package services
 import (
 	"log/slog"
 	"sso_go_grpc/internal/config"
-	"sso_go_grpc/internal/services/role"
+	roleService "sso_go_grpc/internal/services/role"
+	userService "sso_go_grpc/internal/services/user"
 	"sso_go_grpc/internal/storage/postgres"
 	roleStorage "sso_go_grpc/internal/storage/postgres/role"
 	"sso_go_grpc/internal/storage/postgres/user"
@@ -13,7 +14,8 @@ type Services struct {
 	Log *slog.Logger
 	Cfg *config.Config
 	Providers
-	Role *role.Service
+	UserService *userService.UserService
+	RoleService *roleService.RoleService
 }
 
 type Providers struct {
@@ -28,9 +30,15 @@ func New(log *slog.Logger, storage *postgres.Storage, config *config.Config) *Se
 		RoleProvider: storage.Role,
 	}
 
+	user := userService.New(providers.UserProvider, log, config)
+
+	role := roleService.New(user, config, log, providers.RoleProvider)
+
 	return &Services{
-		Providers: providers,
-		Cfg:       config,
-		Log:       log,
+		Providers:   providers,
+		Cfg:         config,
+		Log:         log,
+		RoleService: role,
+		UserService: user,
 	}
 }

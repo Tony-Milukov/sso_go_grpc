@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	grpcApp "sso_go_grpc/internal/app/grpc"
 	"sso_go_grpc/internal/config"
-	authService "sso_go_grpc/internal/services/auth"
+	"sso_go_grpc/internal/services"
 	"sso_go_grpc/internal/storage/postgres"
 )
 
@@ -17,7 +17,7 @@ func New(log *slog.Logger, cfg *config.Config) *App {
 	//setting up storage
 	storage := postgres.MustLoad(cfg, log)
 
-	service := authService.New(log, storage, cfg)
+	service := services.New(log, storage, cfg)
 
 	app := grpcApp.New(log, service, cfg.GRPC.Port)
 

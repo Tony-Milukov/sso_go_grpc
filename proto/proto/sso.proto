@@ -3,13 +3,7 @@ option go_package = "proto/sso";
 
 package api;
 
-service Auth{
-  rpc Register (RegisterRequest) returns (RegisterResponse);
-  rpc Login (LoginRequest) returns (LoginResponse);
-
-  rpc GetUserById (GetUserByIdRequest) returns (GetUserByIdResponse);
-  rpc GetUserByEmail (GetUserEmailRequest) returns (GetUserEmailResponse);
-
+service RoleApi{
   rpc AddUserRole (AddUserRoleRequest) returns (AddUserRoleResponse);
   rpc RemoveUserRole (RemoveUserRoleRequest) returns (RemoveUserRoleResponse);
   rpc VerifyUserRoles  (VerifyUserRolesRequest) returns (VerifyUserRolesResponse);
@@ -17,6 +11,14 @@ service Auth{
   rpc CreateRole (CreateRoleRequest) returns (CreateRoleResponse);
   rpc UpdateRole (UpdateRoleRequest) returns (UpdateRoleResponse);
   rpc DeleteRole  (DeleteRoleRequest) returns (DeleteRoleResponse);
+}
+
+service UserApi{
+  rpc Register (RegisterRequest) returns (RegisterResponse);
+  rpc Login (LoginRequest) returns (LoginResponse);
+
+  rpc GetUserById (GetUserByIdRequest) returns (GetUserByIdResponse);
+  rpc GetUserByEmail (GetUserEmailRequest) returns (GetUserEmailResponse);
 }
 
 // model of user

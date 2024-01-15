@@ -5,8 +5,9 @@ import (
 	"google.golang.org/grpc"
 	"log/slog"
 	"net"
-	authServer "sso_go_grpc/internal/grpc/auth"
-	authService "sso_go_grpc/internal/services/auth"
+	roleServer "sso_go_grpc/internal/grpc/role"
+	userServer "sso_go_grpc/internal/grpc/user"
+	"sso_go_grpc/internal/services"
 )
 
 type App struct {
@@ -50,12 +51,13 @@ func (app *App) Run() error {
 	return nil
 }
 
-func New(log *slog.Logger, authService *authService.Auth, port int) *App {
+func New(log *slog.Logger, services *services.Services, port int) *App {
 	//creating new Grpc Server
 	grpcServer := grpc.NewServer()
 
 	//Register the new gRPC Server with the  AUthService
-	authServer.RegisterServer(grpcServer, authService)
+	userServer.RegisterServer(grpcServer, services.UserService)
+	roleServer.RegisterServer(grpcServer, services.RoleService)
 
 	//return a structure with that params
 	return &App{log: log, gRPCServer: grpcServer, port: port}
